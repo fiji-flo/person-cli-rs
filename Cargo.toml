@@ -1,0 +1,18 @@
+[package]
+name = "person_cli"
+version = "0.1.0"
+authors = ["Florian Merz <flomerz@gmail.com>"]
+edition = "2018"
+
+[lib]
+name = "person_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "person_cli"
+path = "src/main.rs"
+
+[dependencies]
+clap = "2.32.0"
+reqwest = "0.9.8"
+serde_json = "1.0"
