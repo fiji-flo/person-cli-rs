@@ -1,10 +1,46 @@
 use reqwest::Client;
 use serde_json::Value;
+use url::Url;
 
 #[derive(Debug)]
 struct Batch {
     items: Vec<Value>,
     next_page: Option<String>,
+}
+
+pub enum GetBy {
+    UserId,
+    Uuid,
+    PrimaryEmail,
+    PrimaryUsername,
+}
+
+impl GetBy {
+    pub fn as_str(self: &GetBy) -> &'static str {
+        match self {
+            GetBy::UserId => "user_id/",
+            GetBy::Uuid => "uuid/",
+            GetBy::PrimaryEmail => "primary_email/",
+            GetBy::PrimaryUsername => "primary_username/",
+        }
+    }
+}
+
+pub fn get_user(bearer_token: &str, id: &str, by: &GetBy) -> Result<Value, String> {
+    let base = Url::parse("https://person.api.dev.sso.allizom.org/v2/user/")
+        .map_err(|e| format!("{}", e))?;
+    let url = base
+        .join(by.as_str())
+        .and_then(|u| u.join(id))
+        .map_err(|e| format!("{}", e))?;
+    let client = Client::new().get(url.as_str()).bearer_auth(bearer_token);
+    let mut res: reqwest::Response = client.send().map_err(|e| format!("{}", e))?;
+    if res.status().is_success() {
+        res.json()
+            .map_err(|e| format!("Invalid JSON from user endpoint: {}", e))
+    } else {
+        Err(format!("person API returned: {}", res.status()))
+    }
 }
 
 pub fn get_users(bearer_token: &str) -> Result<Vec<Value>, String> {
