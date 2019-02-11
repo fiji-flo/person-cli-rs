@@ -67,6 +67,14 @@ where
                                 .number_of_values(1)
                                 .help("Get user by primary username")
                                 .conflicts_with_all(&["user_id", "uuid", "email"]),
+                        )
+                        .arg(
+                            Arg::with_name("display")
+                                .long("display")
+                                .short("d")
+                                .takes_value(true)
+                                .number_of_values(1)
+                                .help("filter by DISPLAY level")
                         ),
                 )
                 .subcommand(SubCommand::with_name("users").about("Query for a specific user")),
@@ -131,7 +139,7 @@ fn run_person(matches: &ArgMatches) -> Result<String, String> {
         } else {
             return Err(String::from("user command needs a least one argument"));
         };
-        get_user(&token, id, &get_by)
+        get_user(&token, id, &get_by, m.value_of("display"))
             .and_then(|p| serde_json::to_string_pretty(&p).map_err(|e| format!("{}", e)))
     } else if matches.is_present("users") {
         let token = get_access_token(config)?;

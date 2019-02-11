@@ -26,12 +26,16 @@ impl GetBy {
     }
 }
 
-pub fn get_user(bearer_token: &str, id: &str, by: &GetBy) -> Result<Value, String> {
+pub fn get_user(bearer_token: &str, id: &str, by: &GetBy, display: Option<&str>) -> Result<Value, String> {
     let base = Url::parse("https://person.api.dev.sso.allizom.org/v2/user/")
         .map_err(|e| format!("{}", e))?;
     let url = base
         .join(by.as_str())
         .and_then(|u| u.join(id))
+        .map(|mut u| {
+             if let Some(dl) = display { u.set_query(Some(&format!("filterDisplay={}", dl))) }
+             u
+        })
         .map_err(|e| format!("{}", e))?;
     let client = Client::new().get(url.as_str()).bearer_auth(bearer_token);
     let mut res: reqwest::Response = client.send().map_err(|e| format!("{}", e))?;
