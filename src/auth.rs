@@ -8,7 +8,7 @@ struct ClientConfig {
     pub audience: String,
 }
 
-pub fn get_access_token<'a>(config_file: Option<&'a str>) -> Result<String, String> {
+pub fn get_access_token(config_file: Option<&str>) -> Result<String, String> {
     let client_config = read_client_config(config_file.unwrap_or_else(|| ".person-cli.json"))?;
     let payload = json!(
         {

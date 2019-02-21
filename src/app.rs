@@ -74,7 +74,7 @@ where
                                 .short("d")
                                 .takes_value(true)
                                 .number_of_values(1)
-                                .help("filter by DISPLAY level")
+                                .help("filter by DISPLAY level"),
                         ),
                 )
                 .subcommand(SubCommand::with_name("users").about("Query for a specific user")),
@@ -83,20 +83,26 @@ where
             SubCommand::with_name("change")
                 .about("Talk to change api")
                 .arg(
-                    Arg::with_name("user")
-                        .long("user")
+                    Arg::with_name("json")
+                        .long("json")
+                        .short("j")
+                        .required(true)
                         .takes_value(true)
                         .number_of_values(1)
-                        .conflicts_with("users")
-                        .help("Upload user profile from a json file"),
+                        .help("the json file"),
                 )
                 .arg(
-                    Arg::with_name("users")
-                        .long("users")
-                        .takes_value(true)
-                        .number_of_values(1)
-                        .conflicts_with("user")
-                        .help("upload mulitple users from a json file"),
+                    Arg::with_name("sign")
+                        .long("sign")
+                        .short("s")
+                        .help("sign the profile"),
+                )
+                .subcommand(
+                    SubCommand::with_name("user").about("Upload user profile from a json file"),
+                )
+                .subcommand(
+                    SubCommand::with_name("users")
+                        .about("Upload lots of user profiles from a json file"),
                 ),
         )
         .subcommand(SubCommand::with_name("token").about("Get the bearer token"))
@@ -152,15 +158,17 @@ fn run_person(matches: &ArgMatches) -> Result<String, String> {
 
 fn run_change(matches: &ArgMatches) -> Result<String, String> {
     let config = matches.value_of("config");
-    if let Some(f) = matches.value_of("user") {
+    if let Some(json) = matches.value_of("json") {
         let token = get_access_token(config)?;
-        post_single_user(f, &token)
-            .and_then(|v| serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e)))
-    } else if let Some(f) = matches.value_of("users") {
-        let token = get_access_token(config)?;
-        post_lots_of_users(f, &token)
-            .and_then(|v| serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e)))
-    } else {
-        Err(String::from(r"nothing to run \o/"))
+        let sign = matches.is_present("sign");
+        if matches.subcommand_matches("user").is_some() {
+            return post_single_user(json, sign, &token)
+                .and_then(|v| serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e)));
+        } else if matches.subcommand_matches("users").is_some() {
+            let token = get_access_token(config)?;
+            return post_lots_of_users(json, sign, &token)
+                .and_then(|v| serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e)));
+        }
     }
+    Err(String::from(r"nothing to run \o/"))
 }
