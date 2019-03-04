@@ -4,6 +4,7 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use serde_json;
 
 use crate::auth::get_access_token;
+use crate::change::delete_single_user;
 use crate::change::post_lots_of_users;
 use crate::change::post_single_user;
 use crate::users::get_user;
@@ -98,7 +99,14 @@ where
                         .help("sign the profile"),
                 )
                 .subcommand(
-                    SubCommand::with_name("user").about("Upload user profile from a json file"),
+                    SubCommand::with_name("user")
+                        .about("Upload user profile from a json file")
+                        .arg(
+                            Arg::with_name("delete")
+                                .long("delete")
+                                .short("d")
+                                .help("delete the profile"),
+                        ),
                 )
                 .subcommand(
                     SubCommand::with_name("users")
@@ -161,7 +169,11 @@ fn run_change(matches: &ArgMatches) -> Result<String, String> {
     if let Some(json) = matches.value_of("json") {
         let token = get_access_token(config)?;
         let sign = matches.is_present("sign");
-        if matches.subcommand_matches("user").is_some() {
+        if let Some(m) = matches.subcommand_matches("user") {
+            if m.is_present("delete") {
+                return delete_single_user(json, sign, &token)
+                    .and_then(|v| serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e)));
+            }
             return post_single_user(json, sign, &token)
                 .and_then(|v| serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e)));
         } else if matches.subcommand_matches("users").is_some() {
