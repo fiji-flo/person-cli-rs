@@ -18,3 +18,7 @@ reqwest = "0.9.8"
 serde_json = "1.0"
 url = "1.7.2"
 cis_profile = { git = "https://github.com/fiji-flo/cis_profile-rust", features = ["aws"] }
+cis_client = { git = "https://github.com/fiji-flo/cis_client-rust" }
+config = "0.9"
+serde = "1.0.80"
+serde_derive = "1.0.80"

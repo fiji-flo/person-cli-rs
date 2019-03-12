@@ -3,13 +3,13 @@ use std::ffi::OsString;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use serde_json;
 
-use crate::auth::get_access_token;
-use crate::change::delete_single_user;
-use crate::change::post_lots_of_users;
-use crate::change::post_single_user;
-use crate::users::get_user;
-use crate::users::get_users;
-use crate::users::GetBy;
+use crate::loader::load_json;
+use crate::settings;
+use cis_client::client::CisClient;
+use cis_client::client::CisClientTrait;
+use cis_client::client::GetBy;
+use cis_profile::schema::Profile;
+use cis_profile::utils::sign_full_profile;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -22,15 +22,6 @@ where
         .about("Get them all")
         .version(VERSION)
         .author("Florian Merz <fmerz@mozilla.com>")
-        .arg(
-            Arg::with_name("config")
-                .short("c")
-                .long("config")
-                .global(true)
-                .takes_value(true)
-                .number_of_values(1)
-                .help("config file"),
-        )
         .subcommand(
             SubCommand::with_name("person")
                 .about("Talk to person api")
@@ -113,7 +104,6 @@ where
                         .about("Upload lots of user profiles from a json file"),
                 ),
         )
-        .subcommand(SubCommand::with_name("token").about("Get the bearer token"))
         .get_matches_from(itr)
 }
 
@@ -122,14 +112,13 @@ where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
+    let s = settings::Settings::new().map_err(|e| format!("unable to load settings: {}", e))?;
+    let cis_client = CisClient::from_settings(&s.cis)?;
     let all_matches = parse_args(itr);
     let out = if let Some(m) = all_matches.subcommand_matches("person") {
-        run_person(m)
+        run_person(m, cis_client)
     } else if let Some(m) = all_matches.subcommand_matches("change") {
-        run_change(m)
-    } else if let Some(m) = all_matches.subcommand_matches("token") {
-        let config = m.value_of("config");
-        get_access_token(config)
+        run_change(m, cis_client)
     } else {
         Err(String::from("did we forget the subcommand?"))
     }?;
@@ -138,10 +127,8 @@ where
     Ok(())
 }
 
-fn run_person(matches: &ArgMatches) -> Result<String, String> {
-    let config = matches.value_of("config");
+fn run_person(matches: &ArgMatches, cis_client: CisClient) -> Result<String, String> {
     if let Some(m) = matches.subcommand_matches("user") {
-        let token = get_access_token(config)?;
         let (id, get_by) = if let Some(id) = m.value_of("user_id") {
             (id, GetBy::UserId)
         } else if let Some(id) = m.value_of("uuid") {
@@ -153,32 +140,55 @@ fn run_person(matches: &ArgMatches) -> Result<String, String> {
         } else {
             return Err(String::from("user command needs a least one argument"));
         };
-        get_user(&token, id, &get_by, m.value_of("display"))
+        cis_client
+            .get_user_by(id, &get_by, m.value_of("display"))
             .and_then(|p| serde_json::to_string_pretty(&p).map_err(|e| format!("{}", e)))
     } else if matches.is_present("users") {
-        let token = get_access_token(config)?;
-        let profiles = get_users(&token)?;
-        Ok(format!("{}", serde_json::Value::from(profiles)))
+        let profiles = cis_client
+            .get_users_iter(None)?
+            .flatten()
+            .flatten()
+            .collect::<Vec<Profile>>();
+        Ok(serde_json::to_string_pretty(&profiles)
+            .map_err(|e| format!("unable to serialize profiles: {}", e))?)
     } else {
         Err(String::from(r"nothing to run \o/"))
     }
 }
 
-fn run_change(matches: &ArgMatches) -> Result<String, String> {
-    let config = matches.value_of("config");
+fn run_change(matches: &ArgMatches, cis_client: CisClient) -> Result<String, String> {
     if let Some(json) = matches.value_of("json") {
-        let token = get_access_token(config)?;
-        let sign = matches.is_present("sign");
         if let Some(m) = matches.subcommand_matches("user") {
-            if m.is_present("delete") {
-                return delete_single_user(json, sign, &token)
-                    .and_then(|v| serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e)));
+            let mut profile: Profile = serde_json::from_value(load_json(json)?)
+                .map_err(|e| format!("unable to deserialize profile: {}", e))?;
+            let id = profile
+                .user_id
+                .value
+                .clone()
+                .ok_or_else(|| String::from("no user_id set"))?;
+            let sign = matches.is_present("sign");
+            if sign {
+                sign_full_profile(&mut profile, cis_client.get_secret_store())?;
+                if m.is_present("delete") {
+                    return cis_client.delete_user(&id, profile).and_then(|v| {
+                        serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e))
+                    });
+                }
             }
-            return post_single_user(json, sign, &token)
+            return cis_client
+                .update_user(&id, profile)
                 .and_then(|v| serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e)));
         } else if matches.subcommand_matches("users").is_some() {
-            let token = get_access_token(config)?;
-            return post_lots_of_users(json, sign, &token)
+            let mut profiles: Vec<Profile> = serde_json::from_value(load_json(json)?)
+                .map_err(|e| format!("unable to deserialize profile: {}", e))?;
+            let sign = matches.is_present("sign");
+            if sign {
+                for p in &mut profiles {
+                    sign_full_profile(p, cis_client.get_secret_store())?;
+                }
+            }
+            return cis_client
+                .update_users(&profiles)
                 .and_then(|v| serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e)));
         }
     }
