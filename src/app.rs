@@ -22,6 +22,14 @@ where
         .about("Get them all")
         .version(VERSION)
         .author("Florian Merz <fmerz@mozilla.com>")
+        .arg(
+            Arg::with_name("config")
+                .short("c")
+                .long("config")
+                .takes_value(true)
+                .number_of_values(1)
+                .help("set the config"),
+        )
         .subcommand(
             SubCommand::with_name("person")
                 .about("Talk to person api")
@@ -112,9 +120,10 @@ where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
-    let s = settings::Settings::new().map_err(|e| format!("unable to load settings: {}", e))?;
-    let cis_client = CisClient::from_settings(&s.cis)?;
     let all_matches = parse_args(itr);
+    let s = settings::Settings::new(all_matches.value_of("config"))
+        .map_err(|e| format!("unable to load settings: {}", e))?;
+    let cis_client = CisClient::from_settings(&s.cis).map_err(|e| e.to_string())?;
     let out = if let Some(m) = all_matches.subcommand_matches("person") {
         run_person(m, cis_client)
     } else if let Some(m) = all_matches.subcommand_matches("change") {
@@ -142,10 +151,12 @@ fn run_person(matches: &ArgMatches, cis_client: CisClient) -> Result<String, Str
         };
         cis_client
             .get_user_by(id, &get_by, m.value_of("display"))
+            .map_err(|e| e.to_string())
             .and_then(|p| serde_json::to_string_pretty(&p).map_err(|e| format!("{}", e)))
     } else if matches.is_present("users") {
         let profiles = cis_client
-            .get_users_iter(None)?
+            .get_users_iter(None)
+            .map_err(|e| e.to_string())?
             .flatten()
             .flatten()
             .collect::<Vec<Profile>>();
@@ -168,15 +179,20 @@ fn run_change(matches: &ArgMatches, cis_client: CisClient) -> Result<String, Str
                 .ok_or_else(|| String::from("no user_id set"))?;
             let sign = matches.is_present("sign");
             if sign {
-                sign_full_profile(&mut profile, cis_client.get_secret_store())?;
+                sign_full_profile(&mut profile, cis_client.get_secret_store())
+                    .map_err(|e| e.to_string())?;
                 if m.is_present("delete") {
-                    return cis_client.delete_user(&id, profile).and_then(|v| {
-                        serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e))
-                    });
+                    return cis_client
+                        .delete_user(&id, profile)
+                        .map_err(|e| e.to_string())
+                        .and_then(|v| {
+                            serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e))
+                        });
                 }
             }
             return cis_client
                 .update_user(&id, profile)
+                .map_err(|e| e.to_string())
                 .and_then(|v| serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e)));
         } else if matches.subcommand_matches("users").is_some() {
             let mut profiles: Vec<Profile> = serde_json::from_value(load_json(json)?)
@@ -184,11 +200,13 @@ fn run_change(matches: &ArgMatches, cis_client: CisClient) -> Result<String, Str
             let sign = matches.is_present("sign");
             if sign {
                 for p in &mut profiles {
-                    sign_full_profile(p, cis_client.get_secret_store())?;
+                    sign_full_profile(p, cis_client.get_secret_store())
+                        .map_err(|e| e.to_string())?;
                 }
             }
             return cis_client
                 .update_users(&profiles)
+                .map_err(|e| e.to_string())
                 .and_then(|v| serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e)));
         }
     }
