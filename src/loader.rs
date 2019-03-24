@@ -1,8 +1,7 @@
+use serde_json::Value;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::PathBuf;
-
-use serde_json::Value;
 
 pub fn load_json(path: impl Into<PathBuf>) -> Result<Value, String> {
     let mut s = String::new();
