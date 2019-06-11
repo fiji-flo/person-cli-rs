@@ -30,6 +30,7 @@ where
                 .number_of_values(1)
                 .help("set the config"),
         )
+        .subcommand(SubCommand::with_name("token").about("Print the access token"))
         .subcommand(
             SubCommand::with_name("person")
                 .about("Talk to person api")
@@ -80,6 +81,25 @@ where
                 .subcommand(SubCommand::with_name("users").about("Query for a specific user")),
         )
         .subcommand(
+            SubCommand::with_name("sign")
+                .about("Sign an print a profile")
+                .arg(
+                    Arg::with_name("json")
+                        .long("json")
+                        .short("j")
+                        .required(true)
+                        .takes_value(true)
+                        .number_of_values(1)
+                        .help("the json file"),
+                )
+                .arg(
+                    Arg::with_name("pretty")
+                        .long("pretty")
+                        .short("p")
+                        .help("pretty print the profile"),
+                )
+        )
+        .subcommand(
             SubCommand::with_name("change")
                 .about("Talk to change api")
                 .arg(
@@ -128,12 +148,30 @@ where
         run_person(m, cis_client)
     } else if let Some(m) = all_matches.subcommand_matches("change") {
         run_change(m, cis_client)
+    } else if let Some(m) = all_matches.subcommand_matches("sign") {
+        run_sign(m, cis_client)
+    } else if let Some(_) = all_matches.subcommand_matches("token") {
+        cis_client.bearer_token().map_err(|e| e.to_string())
     } else {
         Err(String::from("did we forget the subcommand?"))
     }?;
     println!("{}", out);
 
     Ok(())
+}
+
+fn run_sign(matches: &ArgMatches, cis_client: CisClient) -> Result<String, String> {
+    if let Some(json) = matches.value_of("json") {
+        let mut profile: Profile = serde_json::from_value(load_json(json)?)
+            .map_err(|e| format!("unable to deserialize profile: {}", e))?;
+                sign_full_profile(&mut profile, cis_client.get_secret_store())
+                    .map_err(|e| e.to_string())?;
+        if matches.is_present("pretty") {
+            return serde_json::to_string_pretty(&profile).map_err(|e| format!("{}", e))
+        }
+        return serde_json::to_string(&profile).map_err(|e| format!("{}", e))
+    }
+    Err(String::from("no profile provied"))
 }
 
 fn run_person(matches: &ArgMatches, cis_client: CisClient) -> Result<String, String> {
