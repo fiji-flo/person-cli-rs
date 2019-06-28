@@ -4,12 +4,18 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use serde_json;
 
 use crate::loader::load_json;
+use crate::pictures::has_picture_path;
+use crate::pictures::process_picture;
 use crate::settings;
 use cis_client::client::CisClient;
 use cis_client::client::CisClientTrait;
 use cis_client::client::GetBy;
+use cis_profile::crypto::Signer;
 use cis_profile::schema::Profile;
 use cis_profile::utils::sign_full_profile;
+use std::fs::File;
+use std::io::BufWriter;
+use std::io::Write;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -81,6 +87,42 @@ where
                 .subcommand(SubCommand::with_name("users").about("Query for a specific user")),
         )
         .subcommand(
+            SubCommand::with_name("pictures")
+                .about("do stuff with pics")
+                .subcommand(SubCommand::with_name("list").about("list legacy picture names"))
+                .subcommand(
+                    SubCommand::with_name("process")
+                        .about("resize and update pictures")
+                        .arg(
+                            Arg::with_name("out_path")
+                                .long("out_path")
+                                .short("o")
+                                .required(true)
+                                .takes_value(true)
+                                .number_of_values(1)
+                                .help("the out_path"),
+                        )
+                        .arg(
+                            Arg::with_name("in_path")
+                                .long("in_path")
+                                .short("i")
+                                .required(true)
+                                .takes_value(true)
+                                .number_of_values(1)
+                                .help("the in_path"),
+                        )
+                        .arg(
+                            Arg::with_name("out_file")
+                                .long("out_file")
+                                .short("f")
+                                .required(true)
+                                .takes_value(true)
+                                .number_of_values(1)
+                                .help("the output file"),
+                        ),
+                ),
+        )
+        .subcommand(
             SubCommand::with_name("sign")
                 .about("Sign an print a profile")
                 .arg(
@@ -97,7 +139,7 @@ where
                         .long("pretty")
                         .short("p")
                         .help("pretty print the profile"),
-                )
+                ),
         )
         .subcommand(
             SubCommand::with_name("change")
@@ -130,6 +172,10 @@ where
                 .subcommand(
                     SubCommand::with_name("users")
                         .about("Upload lots of user profiles from a json file"),
+                )
+                .subcommand(
+                    SubCommand::with_name("users_single")
+                        .about("Upload lots of user profiles from a json file"),
                 ),
         )
         .get_matches_from(itr)
@@ -150,6 +196,8 @@ where
         run_change(m, cis_client)
     } else if let Some(m) = all_matches.subcommand_matches("sign") {
         run_sign(m, cis_client)
+    } else if let Some(m) = all_matches.subcommand_matches("pictures") {
+        run_pictures(m, cis_client)
     } else if let Some(_) = all_matches.subcommand_matches("token") {
         cis_client.bearer_token().map_err(|e| e.to_string())
     } else {
@@ -164,12 +212,12 @@ fn run_sign(matches: &ArgMatches, cis_client: CisClient) -> Result<String, Strin
     if let Some(json) = matches.value_of("json") {
         let mut profile: Profile = serde_json::from_value(load_json(json)?)
             .map_err(|e| format!("unable to deserialize profile: {}", e))?;
-                sign_full_profile(&mut profile, cis_client.get_secret_store())
-                    .map_err(|e| e.to_string())?;
+        sign_full_profile(&mut profile, cis_client.get_secret_store())
+            .map_err(|e| e.to_string())?;
         if matches.is_present("pretty") {
-            return serde_json::to_string_pretty(&profile).map_err(|e| format!("{}", e))
+            return serde_json::to_string_pretty(&profile).map_err(|e| format!("{}", e));
         }
-        return serde_json::to_string(&profile).map_err(|e| format!("{}", e))
+        return serde_json::to_string(&profile).map_err(|e| format!("{}", e));
     }
     Err(String::from("no profile provied"))
 }
@@ -200,6 +248,64 @@ fn run_person(matches: &ArgMatches, cis_client: CisClient) -> Result<String, Str
             .collect::<Vec<Profile>>();
         Ok(serde_json::to_string_pretty(&profiles)
             .map_err(|e| format!("unable to serialize profiles: {}", e))?)
+    } else {
+        Err(String::from(r"nothing to run \o/"))
+    }
+}
+
+fn run_pictures(matches: &ArgMatches, cis_client: CisClient) -> Result<String, String> {
+    if let Some(m) = matches.subcommand_matches("process") {
+        let in_path = m
+            .value_of("in_path")
+            .ok_or_else(|| String::from("missing in_path"))?;
+        let out_path = m
+            .value_of("out_path")
+            .ok_or_else(|| String::from("missing out_path"))?;
+        let out_file = m
+            .value_of("out_file")
+            .ok_or_else(|| String::from("missing out_file"))?;
+        let profiles = cis_client
+            .get_users_iter(None)
+            .map_err(|e| e.to_string())?
+            .flatten()
+            .map(|profiles| {
+                profiles
+                    .into_iter()
+                    .filter_map(|profile| process_picture(profile, in_path, out_path))
+                    .map(|mut profile| {
+                        cis_client
+                            .get_secret_store()
+                            .sign_attribute(&mut profile.picture);
+                        profile
+                    })
+                    .collect::<Vec<Profile>>()
+            })
+            .flatten()
+            .collect::<Vec<Profile>>();
+        let output = serde_json::to_string_pretty(&profiles)
+            .map_err(|e| format!("unable to serialize profiles: {}", e))?;
+        let f = File::create(out_file).map_err(|e| e.to_string())?;
+        {
+            let mut writer = BufWriter::new(f);
+            writer.write(output.as_bytes()).map_err(|e| e.to_string())?;
+        }
+        Ok(String::from("done"))
+    } else if let Some(_) = matches.subcommand_matches("list") {
+        for pic in cis_client
+            .get_users_iter(None)
+            .map_err(|e| e.to_string())?
+            .flatten()
+            .map(|profiles| {
+                profiles
+                    .into_iter()
+                    .filter_map(|profile| has_picture_path(profile))
+                    .collect::<Vec<String>>()
+            })
+            .flatten()
+        {
+            println!("{}", pic);
+        }
+        Ok(String::from("done"))
     } else {
         Err(String::from(r"nothing to run \o/"))
     }
@@ -246,6 +352,27 @@ fn run_change(matches: &ArgMatches, cis_client: CisClient) -> Result<String, Str
                 .update_users(&profiles)
                 .map_err(|e| e.to_string())
                 .and_then(|v| serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e)));
+        } else if matches.subcommand_matches("users_single").is_some() {
+            let mut profiles: Vec<Profile> = serde_json::from_value(load_json(json)?)
+                .map_err(|e| format!("unable to deserialize profile: {}", e))?;
+            let sign = matches.is_present("sign");
+            if sign {
+                for p in &mut profiles {
+                    sign_full_profile(p, cis_client.get_secret_store())
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+            let mut i = 0;
+            for p in profiles {
+                let id = p
+                    .user_id
+                    .value
+                    .clone()
+                    .ok_or_else(|| String::from("no user_id set"))?;
+                cis_client.update_user(&id, p).map_err(|e| e.to_string())?;
+                i += 1;
+            }
+            return Ok(format!("updated {} profiles", i));
         }
     }
     Err(String::from(r"nothing to run \o/"))
