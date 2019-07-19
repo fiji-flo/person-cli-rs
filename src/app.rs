@@ -82,7 +82,13 @@ where
                                 .takes_value(true)
                                 .number_of_values(1)
                                 .help("filter by DISPLAY level"),
-                        ),
+                        )
+                        .arg(
+                            Arg::with_name("inactive")
+                                .long("inactive")
+                                .short("i")
+                                .help("get inactive profile"),
+                        )
                 )
                 .subcommand(SubCommand::with_name("users").about("Query for a specific user")),
         )
@@ -235,10 +241,20 @@ fn run_person(matches: &ArgMatches, cis_client: CisClient) -> Result<String, Str
         } else {
             return Err(String::from("user command needs a least one argument"));
         };
+        if m.is_present("inactive") {
+        cis_client
+            .get_inactive_user_by(id, &get_by, m.value_of("display"))
+            .map_err(|e| e.to_string())
+            .and_then(|p| serde_json::to_string_pretty(&p).map_err(|e| format!("{}", e)))
+
+
+        } else {
         cis_client
             .get_user_by(id, &get_by, m.value_of("display"))
             .map_err(|e| e.to_string())
             .and_then(|p| serde_json::to_string_pretty(&p).map_err(|e| format!("{}", e)))
+
+        }
     } else if matches.is_present("users") {
         let profiles = cis_client
             .get_users_iter(None)

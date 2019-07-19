@@ -19,6 +19,7 @@ pub enum ImageProcessingError {
 }
 
 pub struct Avatars {
+    pub raw: Vec<u8>,
     pub x264: Vec<u8>,
     pub x100: Vec<u8>,
     pub x40: Vec<u8>,
@@ -32,7 +33,10 @@ impl Avatars {
         if ratio < 0.95 || ratio > 1.05 {
             return Err(format_err!("wrong ascpect ratio: {}", ratio));
         }
+        let mut raw: Vec<u8> = Vec::new();
+        img.write_to(&mut raw, image::ImageOutputFormat::PNG)?;
         Ok(Avatars {
+            raw,
             x264: downsize(264, &img)?,
             x100: downsize(100, &img)?,
             x40: downsize(40, &img)?,

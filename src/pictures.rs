@@ -64,6 +64,7 @@ pub fn process_picture(profile: Profile, in_path: &str, out_path: &str) -> Optio
 }
 
 fn write_files(avatar: &Avatars, out_path: &str, name: &str) -> Result<(), Error> {
+    write_to_file(&avatar.raw, PathBuf::from(out_path).join("raw").join(name))?;
     write_to_file(&avatar.x40, PathBuf::from(out_path).join("40").join(name))?;
     write_to_file(&avatar.x100, PathBuf::from(out_path).join("100").join(name))?;
     write_to_file(&avatar.x264, PathBuf::from(out_path).join("264").join(name))
