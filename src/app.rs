@@ -76,6 +76,12 @@ where
                                 .takes_value(true)
                                 .number_of_values(1)
                                 .help("filter by DISPLAY level"),
+                        )
+                        .arg(
+                            Arg::with_name("inactive")
+                                .long("inactive")
+                                .short("i")
+                                .help("get inactive profile"),
                         ),
                 )
                 .subcommand(SubCommand::with_name("users").about("Query for a specific user")),
@@ -97,7 +103,7 @@ where
                         .long("pretty")
                         .short("p")
                         .help("pretty print the profile"),
-                )
+                ),
         )
         .subcommand(
             SubCommand::with_name("change")
@@ -129,6 +135,10 @@ where
                 )
                 .subcommand(
                     SubCommand::with_name("users")
+                        .about("Upload lots of user profiles from a json file"),
+                )
+                .subcommand(
+                    SubCommand::with_name("users_single")
                         .about("Upload lots of user profiles from a json file"),
                 ),
         )
@@ -164,12 +174,12 @@ fn run_sign(matches: &ArgMatches, cis_client: CisClient) -> Result<String, Strin
     if let Some(json) = matches.value_of("json") {
         let mut profile: Profile = serde_json::from_value(load_json(json)?)
             .map_err(|e| format!("unable to deserialize profile: {}", e))?;
-                sign_full_profile(&mut profile, cis_client.get_secret_store())
-                    .map_err(|e| e.to_string())?;
+        sign_full_profile(&mut profile, cis_client.get_secret_store())
+            .map_err(|e| e.to_string())?;
         if matches.is_present("pretty") {
-            return serde_json::to_string_pretty(&profile).map_err(|e| format!("{}", e))
+            return serde_json::to_string_pretty(&profile).map_err(|e| format!("{}", e));
         }
-        return serde_json::to_string(&profile).map_err(|e| format!("{}", e))
+        return serde_json::to_string(&profile).map_err(|e| format!("{}", e));
     }
     Err(String::from("no profile provied"))
 }
@@ -187,10 +197,17 @@ fn run_person(matches: &ArgMatches, cis_client: CisClient) -> Result<String, Str
         } else {
             return Err(String::from("user command needs a least one argument"));
         };
-        cis_client
-            .get_user_by(id, &get_by, m.value_of("display"))
-            .map_err(|e| e.to_string())
-            .and_then(|p| serde_json::to_string_pretty(&p).map_err(|e| format!("{}", e)))
+        if m.is_present("inactive") {
+            cis_client
+                .get_inactive_user_by(id, &get_by, m.value_of("display"))
+                .map_err(|e| e.to_string())
+                .and_then(|p| serde_json::to_string_pretty(&p).map_err(|e| format!("{}", e)))
+        } else {
+            cis_client
+                .get_user_by(id, &get_by, m.value_of("display"))
+                .map_err(|e| e.to_string())
+                .and_then(|p| serde_json::to_string_pretty(&p).map_err(|e| format!("{}", e)))
+        }
     } else if matches.is_present("users") {
         let profiles = cis_client
             .get_users_iter(None)
@@ -246,6 +263,27 @@ fn run_change(matches: &ArgMatches, cis_client: CisClient) -> Result<String, Str
                 .update_users(&profiles)
                 .map_err(|e| e.to_string())
                 .and_then(|v| serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e)));
+        } else if matches.subcommand_matches("users_single").is_some() {
+            let mut profiles: Vec<Profile> = serde_json::from_value(load_json(json)?)
+                .map_err(|e| format!("unable to deserialize profile: {}", e))?;
+            let sign = matches.is_present("sign");
+            if sign {
+                for p in &mut profiles {
+                    sign_full_profile(p, cis_client.get_secret_store())
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+            let mut i = 0;
+            for p in profiles {
+                let id = p
+                    .user_id
+                    .value
+                    .clone()
+                    .ok_or_else(|| String::from("no user_id set"))?;
+                cis_client.update_user(&id, p).map_err(|e| e.to_string())?;
+                i += 1;
+            }
+            return Ok(format!("updated {} profiles", i));
         }
     }
     Err(String::from(r"nothing to run \o/"))
