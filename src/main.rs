@@ -1,4 +1,4 @@
-extern crate person_cli;
+use person_cli;
 
 use std::env;
 

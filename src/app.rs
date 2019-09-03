@@ -5,9 +5,9 @@ use serde_json;
 
 use crate::loader::load_json;
 use crate::settings;
-use cis_client::client::CisClient;
-use cis_client::client::CisClientTrait;
-use cis_client::client::GetBy;
+use cis_client::getby::GetBy;
+use cis_client::sync::client::CisClientTrait;
+use cis_client::CisClient;
 use cis_profile::schema::Profile;
 use cis_profile::utils::sign_full_profile;
 
@@ -160,7 +160,7 @@ where
         run_change(m, cis_client)
     } else if let Some(m) = all_matches.subcommand_matches("sign") {
         run_sign(m, cis_client)
-    } else if let Some(_) = all_matches.subcommand_matches("token") {
+    } else if all_matches.subcommand_matches("token").is_some() {
         cis_client.bearer_token().map_err(|e| e.to_string())
     } else {
         Err(String::from("did we forget the subcommand?"))
