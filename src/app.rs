@@ -3,6 +3,7 @@ use std::ffi::OsString;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use serde_json;
 
+use crate::create::create_new_user;
 use crate::loader::load_json;
 use crate::settings;
 use cis_client::getby::GetBy;
@@ -106,6 +107,41 @@ where
                 ),
         )
         .subcommand(
+            SubCommand::with_name("create")
+                .about("Create a new user")
+                .arg(
+                    Arg::with_name("user_id")
+                        .long("user_id")
+                        .required(true)
+                        .takes_value(true)
+                        .number_of_values(1)
+                        .help("profile v2 user_id"),
+                )
+                .arg(
+                    Arg::with_name("email")
+                        .long("email")
+                        .required(true)
+                        .takes_value(true)
+                        .number_of_values(1)
+                        .help("profile v2 primary_email"),
+                )
+                .arg(
+                    Arg::with_name("first_name")
+                        .long("first_name")
+                        .required(true)
+                        .takes_value(true)
+                        .number_of_values(1)
+                        .help("profile v2 first_name"),
+                )
+                .arg(
+                    Arg::with_name("last_name")
+                        .long("last_name")
+                        .takes_value(true)
+                        .number_of_values(1)
+                        .help("profile v2 last_name"),
+                ),
+        )
+        .subcommand(
             SubCommand::with_name("change")
                 .about("Talk to change api")
                 .arg(
@@ -156,6 +192,8 @@ where
     let cis_client = CisClient::from_settings(&s.cis).map_err(|e| e.to_string())?;
     let out = if let Some(m) = all_matches.subcommand_matches("person") {
         run_person(m, cis_client)
+    } else if let Some(m) = all_matches.subcommand_matches("create") {
+        run_create(m, cis_client)
     } else if let Some(m) = all_matches.subcommand_matches("change") {
         run_change(m, cis_client)
     } else if let Some(m) = all_matches.subcommand_matches("sign") {
@@ -220,6 +258,30 @@ fn run_person(matches: &ArgMatches, cis_client: CisClient) -> Result<String, Str
     } else {
         Err(String::from(r"nothing to run \o/"))
     }
+}
+
+fn run_create(matches: &ArgMatches, cis_client: CisClient) -> Result<String, String> {
+    if let (Some(user_id), Some(email), Some(first_name), last_name) = (
+        matches.value_of("user_id"),
+        matches.value_of("email"),
+        matches.value_of("first_name"),
+        matches.value_of("last_name"),
+    ) {
+        let mut profile = create_new_user(
+            user_id.into(),
+            email.into(),
+            first_name.into(),
+            last_name.map(Into::into),
+        )
+        .map_err(|e| format!("{}", e))?;
+        sign_full_profile(&mut profile, cis_client.get_secret_store())
+            .map_err(|e| e.to_string())?;
+        return cis_client
+            .update_user(user_id, profile)
+            .map_err(|e| e.to_string())
+            .and_then(|v| serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e)));
+    }
+    Err(String::from("invalid parameters"))
 }
 
 fn run_change(matches: &ArgMatches, cis_client: CisClient) -> Result<String, String> {
