@@ -7,10 +7,10 @@ use failure::Error;
 
 const CREATE_PROFILE: &str = include_str!("data/user_profile_null_create.json");
 
-fn update_metadata(metadata: &mut Metadata, dispaly: Option<Display>, now: &str) {
+fn update_metadata(metadata: &mut Metadata, display: Option<Display>, now: &str) {
     metadata.last_modified = String::from(now);
     metadata.created = String::from(now);
-    metadata.display = dispaly;
+    metadata.display = display;
 }
 
 pub fn create_new_user(
