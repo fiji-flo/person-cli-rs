@@ -6,11 +6,27 @@ use cis_profile::schema::Profile;
 use failure::Error;
 
 const CREATE_PROFILE: &str = include_str!("data/user_profile_null_create.json");
+const NULL_PROFILE: &str = include_str!("data/user_profile_null.json");
 
 fn update_metadata(metadata: &mut Metadata, display: Option<Display>, now: &str) {
     metadata.last_modified = String::from(now);
     metadata.created = String::from(now);
     metadata.display = display;
+}
+
+pub fn empty_profile(typ: &str) -> Result<String, String> {
+    let p = match typ {
+        "null" => {
+            serde_json::from_str(NULL_PROFILE).map_err(|e| format!("error reading skeleton {}", e))
+        }
+        "create" => serde_json::from_str(CREATE_PROFILE)
+            .map_err(|e| format!("error reading skeleton {}", e)),
+        "rust" => Ok(Profile::default()),
+        _ => Err(String::from("only: null, create, rust supported")),
+    };
+    p.and_then(|p| {
+        serde_json::to_string_pretty(&p).map_err(|e| format!("unable to print profile: {}", e))
+    })
 }
 
 pub fn create_new_user(
