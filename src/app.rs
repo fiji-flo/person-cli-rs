@@ -1,9 +1,11 @@
 use std::ffi::OsString;
+use tokio::runtime::Runtime;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use serde_json;
 
 use crate::create::create_new_user;
+use crate::create::empty_profile;
 use crate::loader::load_json;
 use crate::settings;
 use cis_client::getby::GetBy;
@@ -32,6 +34,18 @@ where
                 .help("set the config"),
         )
         .subcommand(SubCommand::with_name("token").about("Print the access token"))
+        .subcommand(
+            SubCommand::with_name("profile")
+                .about("Print an empty profile")
+                .arg(
+                    Arg::with_name("typ")
+                        .long("typ")
+                        .short("t")
+                        .takes_value(true)
+                        .number_of_values(1)
+                        .help("profile type [null, create, rust]"),
+                ),
+        )
         .subcommand(
             SubCommand::with_name("person")
                 .about("Talk to person api")
@@ -163,6 +177,14 @@ where
                     SubCommand::with_name("user")
                         .about("Upload user profile from a json file")
                         .arg(
+                            Arg::with_name("user_id")
+                                .long("user_id")
+                                .required(true)
+                                .takes_value(true)
+                                .number_of_values(1)
+                                .help("profile v2 user_id"),
+                        )
+                        .arg(
                             Arg::with_name("delete")
                                 .long("delete")
                                 .short("d")
@@ -189,7 +211,7 @@ where
     let all_matches = parse_args(itr);
     let s = settings::Settings::new(all_matches.value_of("config"))
         .map_err(|e| format!("unable to load settings: {}", e))?;
-    let cis_client = CisClient::from_settings(&s.cis).map_err(|e| e.to_string())?;
+    let cis_client = Runtime::new().map_err(|e| e.to_string())?.block_on(CisClient::from_settings(&s.cis)).map_err(|e| e.to_string())?;
     let out = if let Some(m) = all_matches.subcommand_matches("person") {
         run_person(m, cis_client)
     } else if let Some(m) = all_matches.subcommand_matches("create") {
@@ -199,7 +221,9 @@ where
     } else if let Some(m) = all_matches.subcommand_matches("sign") {
         run_sign(m, cis_client)
     } else if all_matches.subcommand_matches("token").is_some() {
-        cis_client.bearer_token().map_err(|e| e.to_string())
+        cis_client.bearer_token_sync().map_err(|e| e.to_string())
+    } else if let Some(m) = all_matches.subcommand_matches("profile") {
+        empty_profile(m.value_of("typ").unwrap_or_default())
     } else {
         Err(String::from("did we forget the subcommand?"))
     }?;
@@ -289,11 +313,14 @@ fn run_change(matches: &ArgMatches, cis_client: CisClient) -> Result<String, Str
         if let Some(m) = matches.subcommand_matches("user") {
             let mut profile: Profile = serde_json::from_value(load_json(json)?)
                 .map_err(|e| format!("unable to deserialize profile: {}", e))?;
-            let id = profile
-                .user_id
-                .value
-                .clone()
-                .ok_or_else(|| String::from("no user_id set"))?;
+            let id = match m.value_of("user_id") {
+                Some(user_id) => user_id.to_owned(),
+                _ => profile
+                    .user_id
+                    .value
+                    .clone()
+                    .ok_or_else(|| String::from("no user_id set"))?,
+            };
             let sign = matches.is_present("sign");
             if sign {
                 sign_full_profile(&mut profile, cis_client.get_secret_store())
