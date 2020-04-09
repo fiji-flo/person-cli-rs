@@ -1,16 +1,15 @@
-use chrono::SecondsFormat;
+use chrono::DateTime;
 use chrono::Utc;
 use cis_profile::schema::Display;
 use cis_profile::schema::Metadata;
 use cis_profile::schema::Profile;
 use failure::Error;
 
-const CREATE_PROFILE: &str = include_str!("data/user_profile_null_create.json");
 const NULL_PROFILE: &str = include_str!("data/user_profile_null.json");
 
-fn update_metadata(metadata: &mut Metadata, display: Option<Display>, now: &str) {
-    metadata.last_modified = String::from(now);
-    metadata.created = String::from(now);
+fn update_metadata(metadata: &mut Metadata, display: Option<Display>, now: &DateTime<Utc>) {
+    metadata.last_modified = *now;
+    metadata.created = *now;
     metadata.display = display;
 }
 
@@ -19,8 +18,6 @@ pub fn empty_profile(typ: &str) -> Result<String, String> {
         "null" => {
             serde_json::from_str(NULL_PROFILE).map_err(|e| format!("error reading skeleton {}", e))
         }
-        "create" => serde_json::from_str(CREATE_PROFILE)
-            .map_err(|e| format!("error reading skeleton {}", e)),
         "rust" => Ok(Profile::default()),
         _ => Err(String::from("only: null, create, rust supported")),
     };
@@ -35,8 +32,8 @@ pub fn create_new_user(
     first_name: String,
     last_name: Option<String>,
 ) -> Result<Profile, Error> {
-    let now = &Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    let mut p: Profile = serde_json::from_str(CREATE_PROFILE)?;
+    let now = &Utc::now();
+    let mut p: Profile = serde_json::from_str(NULL_PROFILE)?;
     p.primary_email.value = Some(primary_email);
     update_metadata(&mut p.primary_email.metadata, Some(Display::Private), now);
     p.user_id.value = Some(user_id);

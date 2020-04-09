@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use tokio::runtime::Runtime;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use serde_json;
@@ -210,7 +211,7 @@ where
     let all_matches = parse_args(itr);
     let s = settings::Settings::new(all_matches.value_of("config"))
         .map_err(|e| format!("unable to load settings: {}", e))?;
-    let cis_client = CisClient::from_settings(&s.cis).map_err(|e| e.to_string())?;
+    let cis_client = Runtime::new().map_err(|e| e.to_string())?.block_on(CisClient::from_settings(&s.cis)).map_err(|e| e.to_string())?;
     let out = if let Some(m) = all_matches.subcommand_matches("person") {
         run_person(m, cis_client)
     } else if let Some(m) = all_matches.subcommand_matches("create") {
@@ -220,7 +221,7 @@ where
     } else if let Some(m) = all_matches.subcommand_matches("sign") {
         run_sign(m, cis_client)
     } else if all_matches.subcommand_matches("token").is_some() {
-        cis_client.bearer_token().map_err(|e| e.to_string())
+        cis_client.bearer_token_sync().map_err(|e| e.to_string())
     } else if let Some(m) = all_matches.subcommand_matches("profile") {
         empty_profile(m.value_of("typ").unwrap_or_default())
     } else {
