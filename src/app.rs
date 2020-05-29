@@ -97,6 +97,12 @@ where
                                 .long("inactive")
                                 .short("i")
                                 .help("get inactive profile"),
+                        )
+                        .arg(
+                            Arg::with_name("any")
+                                .long("any")
+                                .short("a")
+                                .help("get any (in)active profile"),
                         ),
                 )
                 .subcommand(SubCommand::with_name("users").about("Query for a specific user")),
@@ -259,7 +265,12 @@ fn run_person(matches: &ArgMatches, cis_client: CisClient) -> Result<String, Str
         } else {
             return Err(String::from("user command needs a least one argument"));
         };
-        if m.is_present("inactive") {
+        if m.is_present("any") {
+            cis_client
+                .get_any_user_by(id, &get_by, m.value_of("display"))
+                .map_err(|e| e.to_string())
+                .and_then(|p| serde_json::to_string_pretty(&p).map_err(|e| format!("{}", e)))
+        } else if m.is_present("inactive") {
             cis_client
                 .get_inactive_user_by(id, &get_by, m.value_of("display"))
                 .map_err(|e| e.to_string())

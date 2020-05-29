@@ -200,9 +200,9 @@ checksum = "7bbb73db36c1246e9034e307d0fba23f9a2e251faa47ade70c1bd252220c8311"
 
 [[package]]
 name = "cfg-if"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b486ce3ccf7ffd79fdeb678eac06a9e6c09fc88d33836340becb8fffe87c5e33"
+checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 
 [[package]]
 name = "chrono"
@@ -228,8 +228,8 @@ dependencies = [
 
 [[package]]
 name = "cis_client"
-version = "0.6.2"
-source = "git+https://github.com/mozilla-iam/cis_client-rust?tag=0.6.2#f0eabf734bdd2a416e530916f80c196ae7bd08ca"
+version = "0.7.0"
+source = "git+https://github.com/mozilla-iam/cis_client-rust?tag=0.7.0#400cb8df516d99e2c7406a13f8dba919e5f0c3bb"
 dependencies = [
  "biscuit",
  "chrono",
@@ -248,8 +248,8 @@ dependencies = [
 
 [[package]]
 name = "cis_profile"
-version = "0.4.1"
-source = "git+https://github.com/mozilla-iam/cis_profile-rust?tag=0.4.1#fb84b933a2064a41d4b26fa7e1e45e6cc66aaf64"
+version = "0.4.2"
+source = "git+https://github.com/mozilla-iam/cis_profile-rust?tag=0.4.2#c2404479848e60674776fa54020ad4253404e293"
 dependencies = [
  "biscuit",
  "chrono",
@@ -361,8 +361,8 @@ dependencies = [
 
 [[package]]
 name = "dino_park_trust"
-version = "0.0.6"
-source = "git+https://github.com/mozilla-iam/dino-park-trust?tag=0.0.6#5a1c18c9a80e365bb91b9ee862eb816bb348f8ea"
+version = "0.0.7"
+source = "git+https://github.com/mozilla-iam/dino-park-trust?tag=0.0.7#db8e281ad28ef02af79c4f68142282974ecf156a"
 dependencies = [
  "failure",
  "serde 1.0.110",
@@ -814,12 +814,11 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "lexical-core"
-version = "0.6.7"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f86d66d380c9c5a685aaac7a11818bdfa1f733198dfd9ec09c70b762cd12ad6f"
+checksum = "d7043aa5c05dd34fb73b47acb8c3708eac428de4545ea3682ed2f11293ebd890"
 dependencies = [
  "arrayvec 0.4.12",
- "bitflags",
  "cfg-if",
  "rustc_version",
  "ryu",
@@ -1183,7 +1182,7 @@ dependencies = [
  "serde 1.0.110",
  "serde_derive",
  "serde_json",
- "time 0.2.8",
+ "time 0.2.16",
  "tokio",
  "url",
 ]
@@ -1468,7 +1467,7 @@ dependencies = [
  "rustc_version",
  "serde 1.0.110",
  "sha2",
- "time 0.2.8",
+ "time 0.2.16",
  "tokio",
 ]
 
@@ -1517,17 +1516,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 dependencies = [
  "semver",
-]
-
-[[package]]
-name = "rustversion"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3bba175698996010c4f6dce5e7f173b6eb781fce25d2cfc45e27091ce0b79f6"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -1872,16 +1860,16 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.2.8"
+version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d179e6a6f7cab265cad71394b7ca1a9be87309c083732a5da20f4e8ad483bf3"
+checksum = "3a51cadc5b1eec673a685ff7c33192ff7b7603d0b75446fb354939ee615acb15"
 dependencies = [
  "cfg-if",
  "libc",
- "rustversion",
  "standback",
  "stdweb",
  "time-macros",
+ "version_check",
  "winapi 0.3.8",
 ]
 
