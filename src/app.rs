@@ -185,7 +185,6 @@ where
                         .arg(
                             Arg::with_name("user_id")
                                 .long("user_id")
-                                .required(true)
                                 .takes_value(true)
                                 .number_of_values(1)
                                 .help("profile v2 user_id"),
