@@ -13,7 +13,8 @@ impl Settings {
     pub fn new(config_file: Option<&str>) -> Result<Self, ConfigError> {
         let file: PathBuf = config_file.map(|c| PathBuf::from(c)).unwrap_or_else(|| {
             let mut p = config_dir().unwrap();
-            p.push("person_cli.json");
+            p.push("person_cli");
+            p.push("settings.json");
             p
         });
         let mut s = Config::new();

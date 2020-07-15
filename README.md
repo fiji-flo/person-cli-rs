@@ -8,8 +8,10 @@ cargo install --git https://github.com/fiji-flo/person-cli-rs.git
 
 ## Configuration
 
-Either have a config file in the [dirs](https://crates.io/crates/dirs) directory names `person_cli.json`
+Either have a config file in the [dirs](https://crates.io/crates/dirs) directory named
+`person_cli/settings.json` e.g.: `~/.config/person_cli/settins.json`
 or use -c CONFIGFILE` with a config JSON like:
+
 ```json
 {
   "cis": {
