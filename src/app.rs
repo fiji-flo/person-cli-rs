@@ -335,14 +335,14 @@ fn run_change(matches: &ArgMatches, cis_client: CisClient) -> Result<String, Str
             if sign {
                 sign_full_profile(&mut profile, cis_client.get_secret_store())
                     .map_err(|e| e.to_string())?;
-                if m.is_present("delete") {
-                    return cis_client
-                        .delete_user(&id, profile)
-                        .map_err(|e| e.to_string())
-                        .and_then(|v| {
-                            serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e))
-                        });
-                }
+            }
+            if m.is_present("delete") {
+                return cis_client
+                    .delete_user(&id, profile)
+                    .map_err(|e| e.to_string())
+                    .and_then(|v| {
+                        serde_json::to_string_pretty(&v).map_err(|e| format!("{}", e))
+                    });
             }
             return cis_client
                 .update_user(&id, profile)
